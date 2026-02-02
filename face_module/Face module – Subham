@@ -1,0 +1,10 @@
+# Face Module
+
+Owner: Subham
+
+Purpose:
+This module is responsible for face detection from live camera feed.
+It will include face detection, face bounding boxes, and later face recognition logic.
+
+Status:
+Development in progress.
