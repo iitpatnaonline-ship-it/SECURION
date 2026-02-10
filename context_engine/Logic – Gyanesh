@@ -4,3 +4,15 @@ Owner: Gyanesh
 
 Purpose:
 Logic, conditions, and decision-making based on inputs.
+
+from datetime import datetime
+
+def check_time_risk():
+    hour = datetime.now().hour  # 24-hour format
+
+    if 18 <= hour <= 21:
+        return "LOW RISK"
+    elif hour >= 22:
+        return "HIGH RISK"
+    else:
+        return "MEDIUM RISK"
