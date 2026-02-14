@@ -2,17 +2,102 @@
 
 Owner: Gyanesh
 
-Purpose:
-Logic, conditions, and decision-making based on inputs.
+context_engine.py
+
+# SECURION - Context Logic Engine
+# Member-2 : Gyanesh
+# Role : Risk Engine
+
+print("SECURION Context Engine Started")
 
 from datetime import datetime
 
-def check_time_risk():
-    hour = datetime.now().hour  # 24-hour format
+current_time = datetime.now()
+print("Current Hour:", current_time.hour)
 
-    if 18 <= hour <= 21:
-        return "LOW RISK"
-    elif hour >= 22:
-        return "HIGH RISK"
+from datetime import datetime
+
+def check_day_or_night():
+    hour = datetime.now().hour
+    
+    if 6 <= hour < 18:
+        return "DAY"
     else:
-        return "MEDIUM RISK"
+        return "NIGHT"
+
+print(check_day_or_night())
+
+from datetime import datetime
+
+def simple_rule():
+    hour = datetime.now().hour
+    
+    if hour >= 22:
+        return "Suspicious"
+    else:
+        return "Normal"
+
+print(simple_rule())
+
+def allowed_time(hour):
+    if 6 <= hour < 21:
+        return True
+    else:
+        return False
+
+def check_time_risk(hour):
+    if 6 <= hour < 21:
+        return "LOW"
+    elif 21 <= hour < 22:
+        return "MEDIUM"
+    else:
+        return "HIGH"
+
+
+def assign_risk_score(risk_level):
+    scores = {
+        "LOW": 10,
+        "MEDIUM": 40,
+        "HIGH": 70
+    }
+    
+    return scores.get(risk_level, 0)
+
+
+def test_cases():
+    test_hours = [10, 20, 23, 2]
+    
+    for hour in test_hours:
+        risk = check_time_risk(hour)
+        score = assign_risk_score(risk)
+        
+        print("Hour:", hour)
+        print("Risk:", risk)
+        print("Score:", score)
+        print("-------------")
+
+
+from datetime import datetime
+
+def demo():
+    hour = datetime.now().hour
+    risk = check_time_risk(hour)
+    score = assign_risk_score(risk)
+    
+    print("Current Hour:", hour)
+    print("Risk Level:", risk)
+    print("Risk Score:", score)
+    
+    if score >= 70:
+        print("ALERT 🚨")
+    else:
+        print("Monitoring...")
+
+
+def check_zone_risk(zone):
+    if zone.lower() == "restricted":
+        return "HIGH"
+    elif zone.lower() == "office":
+        return "MEDIUM"
+    else:
+        return "LOW"
