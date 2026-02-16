@@ -8,49 +8,75 @@ context_engine.py
 # Member-2 : Gyanesh
 # Role : Risk Engine
 
-print("SECURION Context Engine Started")
-
 import datetime
 
-def get_securion_risk(face_detected, zone):
-    # Mathematics: Time Window T = [22, 8]
+def securion_risk_engine(face_detected, zone, behavior_type):
+    """
+    SECURION Final Risk Engine
+    R = Face + Time + Zone + Behavior
+    """
+
     now = datetime.datetime.now()
     hour = now.hour
-    
-    # Strictly 10 PM (22) to 8 AM (8)
-    is_restricted_time = hour >= 22 or hour < 8
-    
+
+    # Night window: 10 PM to 8 AM
+    is_night = hour >= 22 or hour < 8
+
     risk_score = 0
-    status = "NORMAL"
-    
+    details = []
+
+    # 1️⃣ Face Factor
     if face_detected:
-        # [span_1](start_span)Base Face Detection Score[span_1](end_span)
-        risk_score += 50 
-        
-        # [span_2](start_span)Time Factor (Weightage = 20)[span_2](end_span)
-        if is_restricted_time:
-            risk_score += 20
-            
-        # [span_3](start_span)Zone Factor (Weightage = 30)[span_3](end_span)
-        if zone == "RESTRICTED":
-            risk_score += 30
+        risk_score += 40
+        details.append("Face Detected")
 
-    # [span_4](start_span)Final Risk Level Calculation[span_4](end_span)
-    if risk_score >= 80:
-        status = "⚠️ CRITICAL ALERT"
-    elif risk_score >= 50:
+    # 2️⃣ Time Factor
+    if is_night:
+        risk_score += 20
+        details.append("Night Access")
+
+    # 3️⃣ Zone Factor
+    if zone == "RESTRICTED":
+        risk_score += 20
+        details.append("Restricted Zone")
+
+    # 4️⃣ Behavior Factor (Independent of Face)
+    if behavior_type == "LOITERING":
+        risk_score += 20
+        details.append("Suspicious Loitering")
+    elif behavior_type == "RUNNING":
+        risk_score += 30
+        details.append("High Speed Movement")
+
+    # Cap score at 100
+    risk_score = min(risk_score, 100)
+
+    # 5️⃣ Final Status (Roadmap Aligned)
+    if risk_score >= 70:
+        status = "⚠️ ALERT"
+    elif risk_score >= 40:
         status = "🔔 WARNING"
-        
-    return status, risk_score, now.strftime("%H:%M:%S")
+    else:
+        status = "✅ NORMAL"
 
-# --- AUTO-RUN TEST ---
-# Maan lo abhi test kar rahe hain: Face Detect hua Restricted Zone mein
-res_status, res_score, res_time = get_securion_risk(True, "RESTRICTED")
+    return {
+        "Time": now.strftime("%H:%M:%S"),
+        "Risk Score": risk_score,
+        "Status": status,
+        "Factors": details
+    }
 
-print("="*30)
-print(f"SECURION SYSTEM LOG")
-print("="*30)
-print(f"Time of Detection: {res_time}")
-print(f"Risk Score: {res_score}/100")
-print(f"System Status: {res_status}")
-print("="*30)
+
+# -------- DEMO RUN --------
+result = securion_risk_engine(
+    face_detected=True,
+    zone="RESTRICTED",
+    behavior_type="LOITERING"
+)
+
+print("=" * 40)
+print("SECURION FINAL SYSTEM LOG")
+print("=" * 40)
+for key, value in result.items():
+    print(f"{key}: {value}")
+print("=" * 40)
