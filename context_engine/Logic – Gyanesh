@@ -10,94 +10,47 @@ context_engine.py
 
 print("SECURION Context Engine Started")
 
-from datetime import datetime
+import datetime
 
-current_time = datetime.now()
-print("Current Hour:", current_time.hour)
-
-from datetime import datetime
-
-def check_day_or_night():
-    hour = datetime.now().hour
+def get_securion_risk(face_detected, zone):
+    # Mathematics: Time Window T = [22, 8]
+    now = datetime.datetime.now()
+    hour = now.hour
     
-    if 6 <= hour < 18:
-        return "DAY"
-    else:
-        return "NIGHT"
-
-print(check_day_or_night())
-
-from datetime import datetime
-
-def simple_rule():
-    hour = datetime.now().hour
+    # Strictly 10 PM (22) to 8 AM (8)
+    is_restricted_time = hour >= 22 or hour < 8
     
-    if hour >= 22:
-        return "Suspicious"
-    else:
-        return "Normal"
-
-print(simple_rule())
-
-def allowed_time(hour):
-    if 6 <= hour < 21:
-        return True
-    else:
-        return False
-
-def check_time_risk(hour):
-    if 6 <= hour < 21:
-        return "LOW"
-    elif 21 <= hour < 22:
-        return "MEDIUM"
-    else:
-        return "HIGH"
-
-
-def assign_risk_score(risk_level):
-    scores = {
-        "LOW": 10,
-        "MEDIUM": 40,
-        "HIGH": 70
-    }
+    risk_score = 0
+    status = "NORMAL"
     
-    return scores.get(risk_level, 0)
-
-
-def test_cases():
-    test_hours = [10, 20, 23, 2]
-    
-    for hour in test_hours:
-        risk = check_time_risk(hour)
-        score = assign_risk_score(risk)
+    if face_detected:
+        # [span_1](start_span)Base Face Detection Score[span_1](end_span)
+        risk_score += 50 
         
-        print("Hour:", hour)
-        print("Risk:", risk)
-        print("Score:", score)
-        print("-------------")
+        # [span_2](start_span)Time Factor (Weightage = 20)[span_2](end_span)
+        if is_restricted_time:
+            risk_score += 20
+            
+        # [span_3](start_span)Zone Factor (Weightage = 30)[span_3](end_span)
+        if zone == "RESTRICTED":
+            risk_score += 30
 
+    # [span_4](start_span)Final Risk Level Calculation[span_4](end_span)
+    if risk_score >= 80:
+        status = "⚠️ CRITICAL ALERT"
+    elif risk_score >= 50:
+        status = "🔔 WARNING"
+        
+    return status, risk_score, now.strftime("%H:%M:%S")
 
-from datetime import datetime
+# --- AUTO-RUN TEST ---
+# Maan lo abhi test kar rahe hain: Face Detect hua Restricted Zone mein
+res_status, res_score, res_time = get_securion_risk(True, "RESTRICTED")
 
-def demo():
-    hour = datetime.now().hour
-    risk = check_time_risk(hour)
-    score = assign_risk_score(risk)
-    
-    print("Current Hour:", hour)
-    print("Risk Level:", risk)
-    print("Risk Score:", score)
-    
-    if score >= 70:
-        print("ALERT 🚨")
-    else:
-        print("Monitoring...")
-
-
-def check_zone_risk(zone):
-    if zone.lower() == "restricted":
-        return "HIGH"
-    elif zone.lower() == "office":
-        return "MEDIUM"
-    else:
-        return "LOW"
+print("="*30)
+print(f"SECURION SYSTEM LOG")
+print("="*30)
+print(f"Time of Detection: {res_time}")
+print(f"Risk Score: {res_score}/100")
+print(f"System Status: {res_status}")
+print("="*30)
