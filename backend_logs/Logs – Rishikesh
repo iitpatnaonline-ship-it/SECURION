@@ -4,3 +4,33 @@ Owner: Rishikesh
 
 Purpose:
 Logging, alert storage, and backend-related tasks.
+import csv
+from datetime import datetime
+import os
+
+file_name = "log.csv"
+
+# Create log file with header if not exists
+def create_log_file():
+    if not os.path.exists(file_name):
+        with open(file_name, "w", newline="") as file:
+            writer = csv.writer(file)
+            writer.writerow(["Time", "Person", "Risk", "Status"])
+
+# Reusable logging function
+def write_log(person, risk, status):
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log_data = [current_time, person, risk, status]
+
+    with open(file_name, "a", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(log_data)
+
+    print("Log Added:", log_data)
+
+# Main
+create_log_file()
+
+# Example calls
+write_log("Unknown", "High", "Alert")
+write_log("Rushi", "Low", "Allowed")
