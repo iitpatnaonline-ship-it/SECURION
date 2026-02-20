@@ -9,74 +9,84 @@ context_engine.py
 # Role : Risk Engine
 
 import datetime
+import time
 
-def securion_risk_engine(face_detected, zone, behavior_type):
-    """
-    SECURION Final Risk Engine
-    R = Face + Time + Zone + Behavior
-    """
+# -------- GLOBAL ALERT CONTROL --------
+COOLDOWN_SECONDS = 30
+last_alert_time = 0
+
+
+def calculate_securion_risk(face_detected, zone, behavior):
+    global last_alert_time
 
     now = datetime.datetime.now()
     hour = now.hour
+    current_time = time.time()
 
-    # Night window: 10 PM to 8 AM
-    is_night = hour >= 22 or hour < 8
+    # Night Logic (10 PM – 8 AM)
+    is_night = (hour >= 22 or hour < 8)
 
     risk_score = 0
     details = []
 
-    # 1️⃣ Face Factor
+    # ---------------- FACE LOGIC ----------------
     if face_detected:
-        risk_score += 40
-        details.append("Face Detected")
+        risk_score += 50
+        details.append("Face Match: YES")
 
-    # 2️⃣ Time Factor
-    if is_night:
-        risk_score += 20
-        details.append("Night Access")
+        if is_night:
+            risk_score += 20
+            details.append(f"Night Access ({now.strftime('%H:%M')})")
 
-    # 3️⃣ Zone Factor
-    if zone == "RESTRICTED":
-        risk_score += 20
-        details.append("Restricted Zone")
+        if zone == "RESTRICTED":
+            risk_score += 30
+            details.append("Restricted Area Entry")
 
-    # 4️⃣ Behavior Factor (Independent of Face)
-    if behavior_type == "LOITERING":
+    # ---------------- BEHAVIOR LOGIC ----------------
+    if behavior == "LOITERING":
         risk_score += 20
         details.append("Suspicious Loitering")
-    elif behavior_type == "RUNNING":
+
+    elif behavior == "RUNNING":
         risk_score += 30
-        details.append("High Speed Movement")
+        details.append("High-Speed Movement")
 
     # Cap score at 100
-    risk_score = min(risk_score, 100)
+    final_score = min(risk_score, 100)
 
-    # 5️⃣ Final Status (Roadmap Aligned)
-    if risk_score >= 70:
-        status = "⚠️ ALERT"
-    elif risk_score >= 40:
+    # ---------------- DECISION ENGINE ----------------
+    if final_score >= 70:
+        # Cooldown check
+        if current_time - last_alert_time > COOLDOWN_SECONDS:
+            status = "⚠️ ALERT"
+            last_alert_time = current_time
+        else:
+            status = "⏳ COOLDOWN ACTIVE (Alert Suppressed)"
+
+    elif final_score >= 50:
         status = "🔔 WARNING"
+
     else:
         status = "✅ NORMAL"
 
     return {
-        "Time": now.strftime("%H:%M:%S"),
-        "Risk Score": risk_score,
+        "Time": now.strftime("%Y-%m-%d %H:%M:%S"),
+        "Score": f"{final_score}%",
         "Status": status,
-        "Factors": details
+        "Analysis": details
     }
 
 
-# -------- DEMO RUN --------
-result = securion_risk_engine(
-    face_detected=True,
-    zone="RESTRICTED",
-    behavior_type="LOITERING"
-)
+# ---------------- TEST BLOCK ----------------
+if __name__ == "__main__":
 
-print("=" * 40)
-print("SECURION FINAL SYSTEM LOG")
-print("=" * 40)
-for key, value in result.items():
-    print(f"{key}: {value}")
-print("=" * 40)
+    print("\n" + "=" * 45)
+    print("      SECURION SYSTEM LOG (DAY 16 PRO)     ")
+    print("=" * 45)
+
+    result = calculate_securion_risk(True, "RESTRICTED", "LOITERING")
+
+    for key, value in result.items():
+        print(f"{key}: {value}")
+
+    print("=" * 45 + "\n")
