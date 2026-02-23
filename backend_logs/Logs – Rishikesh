@@ -34,3 +34,44 @@ create_log_file()
 # Example calls
 write_log("Unknown", "High", "Alert")
 write_log("Rushi", "Low", "Allowed")
+import csv
+import os
+from datetime import datetime
+
+file_name = "log.csv"
+
+# Create log file with header if not exists
+def create_log_file():
+    if not os.path.exists(file_name):
+        with open(file_name, "w", newline="") as file:
+            writer = csv.writer(file)
+            writer.writerow(["Time", "Event"])
+
+# Write event with timestamp
+def write_event(event):
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    with open(file_name, "a", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow([current_time, event])
+
+    print("Event Logged with Timestamp!")
+
+if __name__ == "__main__":
+    create_log_file()
+
+    print("---- ALERT EVENT SYSTEM ----")
+    print("1. Detected")
+    print("2. Ignored")
+
+    choice = input("Select Event (1 or 2): ")
+
+    if choice == "1":
+        event = "Detected"
+    elif choice == "2":
+        event = "Ignored"
+    else:
+        print("Invalid choice! Default set to Ignored.")
+        event = "Ignored"
+
+    write_event(event)
