@@ -1,68 +1,154 @@
-import face_recognition
 import cv2
+import face_recognition
+import pickle
+import time
+import threading
 import os
 import numpy as np
+from playsound import playsound
 
-# ---------- LOAD KNOWN FACES ----------
-known_encodings = []
-known_names = []
+# ---------------- SETTINGS ---------------- #
+ALARM_DURATION = 30
+RESET_HOURS = 5
+SAVE_LIMIT = 2
+TOLERANCE = 0.55
+DETECTION_INTERVAL = 8
+TRACKER_TIMEOUT = 2  # seconds without detection refresh
+# ------------------------------------------ #
 
-for file in os.listdir("known_faces"):
-    img = face_recognition.load_image_file(f"known_faces/{file}")
-    enc = face_recognition.face_encodings(img)[0]
-    known_encodings.append(enc)
-    known_names.append(os.path.splitext(file)[0])
+with open("encodings.pkl", "rb") as f:
+    data = pickle.load(f)
 
-print("Known faces loaded:", known_names)
+known_encodings = data["encodings"]
+known_names = data["names"]
 
-# ---------- START CAMERA ----------
-video = cv2.VideoCapture(0)
+if not os.path.exists("captures"):
+    os.makedirs("captures")
+
+cap = cv2.VideoCapture(0)
+
+trackers = []
+person_memory = {}
+frame_count = 0
+
+
+def play_alarm():
+    start = time.time()
+    while time.time() - start < ALARM_DURATION:
+        playsound("alarm.mp3")
+
+
+print("Starting camera...")
 
 while True:
-    ret, frame = video.read()
+    ret, frame = cap.read()
+    if not ret:
+        break
 
-    # resize frame for faster processing
-    small = cv2.resize(frame, (0,0), fx=0.25, fy=0.25)
-    rgb_small = cv2.cvtColor(small, cv2.COLOR_BGR2RGB)
+    frame_count += 1
 
-    # detect faces
-    locations = face_recognition.face_locations(rgb_small, model="hog")
-    encodings = face_recognition.face_encodings(rgb_small, locations)
+    # Lighting normalization (improves recognition)
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    gray = cv2.equalizeHist(gray)
+    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-    # ---------- LOOP THROUGH ALL FACES ----------
-    for (top, right, bottom, left), face_encoding in zip(locations, encodings):
+    current_time = time.time()
 
-        matches = face_recognition.compare_faces(known_encodings, face_encoding, tolerance=0.5)
-        distances = face_recognition.face_distance(known_encodings, face_encoding)
+    # ---------------- UPDATE TRACKERS ---------------- #
+    updated_trackers = []
 
-        name = "Unknown"
-        color = (0,0,255)
+    for t in trackers:
+        success, box = t["tracker"].update(frame)
 
-        if len(distances) > 0:
-            best_match = np.argmin(distances)
-            if matches[best_match]:
-                name = known_names[best_match]
-                color = (0,255,0)
+        if success:
+            t["box"] = box
 
-        # scale box back to original size
-        top *= 4
-        right *= 4
-        bottom *= 4
-        left *= 4
+            # remove tracker if not refreshed recently
+            if current_time - t["last_seen"] < TRACKER_TIMEOUT:
+                updated_trackers.append(t)
 
-        # draw rectangle
-        cv2.rectangle(frame,(left,top),(right,bottom),color,2)
+            (x, y, w, h) = [int(v) for v in box]
+            color = (0, 255, 0) if t["name"] != "Unknown" else (0, 0, 255)
 
-        # label
-        cv2.putText(frame,name,(left,top-10),
-                    cv2.FONT_HERSHEY_SIMPLEX,0.8,color,2)
+            cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
+            cv2.putText(frame, t["name"], (x, y - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
 
-    # show window
-    cv2.imshow("Face Recognition", frame)
+    trackers = updated_trackers
 
-    # press Q to quit
+    # ---------------- FACE DETECTION ---------------- #
+    if frame_count % DETECTION_INTERVAL == 0:
+
+        face_locations = face_recognition.face_locations(rgb)
+        face_encodings = face_recognition.face_encodings(rgb, face_locations)
+
+        for (top, right, bottom, left), encoding in zip(face_locations, face_encodings):
+
+            face_distances = face_recognition.face_distance(known_encodings, encoding)
+
+            name = "Unknown"
+
+            if len(face_distances) > 0:
+                best_match_index = np.argmin(face_distances)
+
+                if face_distances[best_match_index] < TOLERANCE:
+                    name = known_names[best_match_index]
+
+            new_box = (left, top, right - left, bottom - top)
+
+            matched_tracker = None
+
+            for t in trackers:
+                (x, y, w, h) = [int(v) for v in t["box"]]
+
+                if abs(x - left) < 50 and abs(y - top) < 50:
+                    matched_tracker = t
+                    break
+
+            if matched_tracker:
+                matched_tracker["last_seen"] = current_time
+                continue
+
+            tracker = cv2.legacy.TrackerCSRT_create()
+            tracker.init(frame, new_box)
+
+            trackers.append({
+                "tracker": tracker,
+                "name": name,
+                "box": new_box,
+                "last_seen": current_time
+            })
+
+            # ---------------- ALARM & SAVE ---------------- #
+            if name != "Unknown":
+
+                if name not in person_memory:
+                    person_memory[name] = {
+                        "last_reset": 0,
+                        "captures": 0,
+                        "alarm_played": False
+                    }
+
+                pdata = person_memory[name]
+
+                if current_time - pdata["last_reset"] > RESET_HOURS * 3600:
+                    pdata["last_reset"] = current_time
+                    pdata["captures"] = 0
+                    pdata["alarm_played"] = False
+
+                if not pdata["alarm_played"]:
+                    threading.Thread(target=play_alarm, daemon=True).start()
+                    pdata["alarm_played"] = True
+
+                if pdata["captures"] < SAVE_LIMIT:
+                    filename = f"captures/{name}_{int(current_time)}.jpg"
+                    cv2.imwrite(filename, frame)
+                    pdata["captures"] += 1
+
+    cv2.imshow("Live Recognition", frame)
+
     if cv2.waitKey(1) & 0xFF == ord("q"):
         break
 
-video.release()
+cap.release()
 cv2.destroyAllWindows()
