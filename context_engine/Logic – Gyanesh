@@ -9,88 +9,157 @@ context_engine.py
 # Role : Risk Engine
 
 import datetime
+import time
+import signal
+import sys
 
-def calculate_securion_score(face_detected, zone, behavior):
-    """
-    Contextual Scoring: Face, Zone, and Behavior integration.
-    """
-    score = 0
-    if face_detected:
-        score += 50  # Base match score
-        if zone == "RESTRICTED":
-            score += 30  # Location penalty
-        if behavior == "LOITERING":
-            score += 20  # Behavioral penalty
-    
-    return min(score, 100)
 
-def evaluate_risk_status(score):
-    """
-    Final Decision Engine based on Time-Windows and Risk Thresholds.
-    """
-    now = datetime.datetime.now()
-    current_hour = now.hour
-    current_time = now.strftime("%H:%M:%S")
+class SecurionSystem:
 
-    # 1. Score Classification (Standard 100/3 Scale)
-    if score <= 33.33:
-        score_level = "LOW"
-    elif score <= 66.66:
-        score_level = "MEDIUM"
-    else:
-        score_level = "HIGH"
+    def __init__(self,
+                 frame_threshold=3,
+                 cooldown_seconds=10):
 
-    # 2. Time-Window Classification
-    if 6 <= current_hour < 18:
-        time_level = "LOW (Day)"
-    elif 18 <= current_hour < 23:
-        time_level = "MEDIUM (Evening)"
-    else:
-        time_level = "HIGH (Late Night)"
+        self.frame_threshold = frame_threshold
+        self.cooldown_seconds = cooldown_seconds
 
-    # 3. Decision Logic
-    trigger_alarm = False
-    status = "SAFE"
-    reason = "Standard Activity"
+        self.frame_counter = 0
+        self.last_alert_time = 0
+        self.running = True
 
-    # Condition A: Absolute High Risk
-    if score_level == "HIGH":
-        status = "CRITICAL"
-        trigger_alarm = True
-        reason = "Critical Risk Score (>66.66)"
+        signal.signal(signal.SIGINT, self.shutdown)
 
-    # Condition B: High-Sensitivity Night Mode
-    elif time_level == "HIGH (Late Night)" and score > 15:
-        status = "CRITICAL"
-        trigger_alarm = True
-        reason = "Suspicious Night Movement (Score > 15)"
+    # -----------------------------
+    # CLEAN SHUTDOWN
+    # -----------------------------
+    def shutdown(self, signum, frame):
+        print("\n[INFO] SECURION shutting down safely...")
+        self.running = False
+        sys.exit(0)
 
-    # Condition C: Evening Warning
-    elif time_level == "MEDIUM (Evening)" and score_level == "MEDIUM":
-        status = "WARNING"
-        trigger_alarm = True
-        reason = "Unusual Evening Activity"
+    # -----------------------------
+    # SCORING ENGINE
+    # -----------------------------
+    def calculate_score(self, face_detected, zone, behavior):
+        score = 0
 
-    return {
-        "Timestamp": current_time,
-        "Risk_Score": f"{score}%",
-        "Risk_Level": score_level,
-        "Time_Window": time_level,
-        "System_Status": status,
-        "Alarm": "🚨 ACTIVE" if trigger_alarm else "✅ STANDBY",
-        "Analysis": reason
-    }
+        if face_detected:
+            score += 50
 
-# --- TEST EXECUTION ---
+            if zone == "RESTRICTED":
+                score += 30
+
+            if behavior == "LOITERING":
+                score += 20
+
+        return min(score, 100)
+
+    # -----------------------------
+    # DECISION ENGINE
+    # -----------------------------
+    def evaluate(self, score):
+        now = datetime.datetime.now()
+        hour = now.hour
+        timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
+
+        if score <= 33:
+            score_level = "LOW"
+        elif score <= 66:
+            score_level = "MEDIUM"
+        else:
+            score_level = "HIGH"
+
+        if 6 <= hour < 18:
+            time_level = "DAY"
+        elif 18 <= hour < 23:
+            time_level = "EVENING"
+        else:
+            time_level = "LATE NIGHT"
+
+        trigger = False
+        status = "SAFE"
+        reason = "Normal Activity"
+
+        if score_level == "HIGH":
+            trigger = True
+            status = "CRITICAL"
+            reason = "High Risk Score"
+
+        elif time_level == "LATE NIGHT" and score > 15:
+            trigger = True
+            status = "CRITICAL"
+            reason = "Suspicious Night Activity"
+
+        elif time_level == "EVENING" and score_level == "MEDIUM":
+            trigger = True
+            status = "WARNING"
+            reason = "Evening Irregular Activity"
+
+        return {
+            "timestamp": timestamp,
+            "score": score,
+            "score_level": score_level,
+            "time_window": time_level,
+            "trigger": trigger,
+            "status": status,
+            "reason": reason
+        }
+
+    # -----------------------------
+    # MAIN FRAME PROCESSOR
+    # -----------------------------
+    def process_frame(self, face_detected, zone, behavior):
+
+        score = self.calculate_score(face_detected, zone, behavior)
+        evaluation = self.evaluate(score)
+
+        if evaluation["trigger"]:
+            self.frame_counter += 1
+        else:
+            self.frame_counter = 0
+
+        cooldown_active = (time.time() - self.last_alert_time) < self.cooldown_seconds
+
+        alarm = "STANDBY"
+
+        if self.frame_counter >= self.frame_threshold and not cooldown_active:
+            alarm = "ACTIVE"
+            self.last_alert_time = time.time()
+            self.frame_counter = 0
+
+        evaluation["frame_count"] = self.frame_counter
+        evaluation["alarm"] = alarm
+
+        return evaluation
+
+    # -----------------------------
+    # REAL-TIME RUN LOOP
+    # -----------------------------
+    def run(self):
+
+        print("\n===============================")
+        print("  SECURION LIVE MONITORING ON  ")
+        print("===============================")
+        print("Press CTRL+C to stop\n")
+
+        while self.running:
+
+            # 🔴 REPLACE THIS PART WITH REAL CAMERA INPUT
+            face_detected = True
+            zone = "RESTRICTED"
+            behavior = "LOITERING"
+
+            result = self.process_frame(face_detected, zone, behavior)
+
+            print(result)
+
+            time.sleep(1)
+
+
+# -----------------------------
+# SYSTEM START
+# -----------------------------
 if __name__ == "__main__":
-    # Example Scenario
-    current_score = calculate_securion_score(face_detected=True, zone="RESTRICTED", behavior="LOITERING")
-    report = evaluate_risk_status(current_score)
-
-    print("\n" + "="*40)
-    print("      SECURION AI MONITORING LOG      ")
-    print("="*40)
-    for key, value in report.items():
-        print(f"{key:15}: {value}")
-    print("="*40 + "\n")
-
+    system = SecurionSystem(frame_threshold=3, cooldown_seconds=10)
+    system.run()
+    
